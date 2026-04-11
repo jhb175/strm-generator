@@ -45,15 +45,6 @@ docker compose up -d --build
 - Frontend: `http://localhost:8888`
 - Backend API: `http://localhost:3011`
 
-## Recommended Path Mapping
-
-| Purpose | Host Path | Container Path |
-| --- | --- | --- |
-| Media source | `/data/clouddrive/gdrive` | `/data/clouddrive/gdrive` |
-| STRM output | `/opt/strm` | `/app/output` |
-| Emby media mount | `/data/clouddrive/gdrive` | `/media` |
-| Emby STRM library mount | `/opt/strm` | `/strm` |
-
 ## STRM Content Format
 Generated `.strm` files contain absolute paths accessible inside the media server container, for example:
 

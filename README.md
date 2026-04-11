@@ -44,15 +44,6 @@ docker compose up -d --build
 - 前端：`http://localhost:8888`
 - 后端：`http://localhost:3011`
 
-## 当前推荐目录映射
-
-| 用途 | 宿主机路径 | 容器内路径 |
-| --- | --- | --- |
-| 媒体源目录 | `/data/clouddrive/gdrive` | `/data/clouddrive/gdrive` |
-| STRM 输出目录 | `/opt/strm` | `/app/output` |
-| Emby 媒体源挂载 | `/data/clouddrive/gdrive` | `/media` |
-| Emby STRM 库挂载 | `/opt/strm` | `/strm` |
-
 ## STRM 内容格式
 当前 `.strm` 文件内容为容器内可访问的绝对路径，例如：
 
