@@ -15,8 +15,8 @@ ENV STRM_SOURCE_DIR=/data/clouddrive/gdrive
 ENV STRM_OUTPUT_DIR=/app/output
 
 # Basic Auth credentials (change these in production!)
-ENV STRS_AUTH_USER=admin
-ENV STRS_AUTH_PASS=strm2026
+ENV STRS_AUTH_USER=jdyyds
+ENV STRS_AUTH_PASS=f15015699065
 
 # Create dirs
 RUN mkdir -p /app/data /app/output /app/data/logs

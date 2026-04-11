@@ -9,12 +9,12 @@ security = HTTPBasic()
 
 def get_auth_user() -> str:
     """Return configured auth username."""
-    return os.getenv("STRS_AUTH_USER", "admin")
+    return os.getenv("STRS_AUTH_USER", "jdyyds")
 
 
 def get_auth_pass() -> str:
     """Return configured auth password."""
-    return os.getenv("STRS_AUTH_PASS", "strm2026")
+    return os.getenv("STRS_AUTH_PASS", "f15015699065")
 
 
 def basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
