@@ -2,10 +2,13 @@
 import asyncio
 import datetime
 import json
+import os
 import threading
 from pathlib import Path
+from urllib.parse import urlencode
+from urllib.request import urlopen, Request
 
-from fastapi import APIRouter, Depends, BackgroundTasks
+from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -16,6 +19,7 @@ from app.models import TaskRun, OpLog, Config, StrmFile
 from app.services.state import task_state, log_op
 from app.services.generator import run_scan, run_generate, run_cleanup
 from app.services.websocket import ws_manager
+from app.services.scheduler import get_scheduler_config, save_scheduler_config
 
 
 router = APIRouter(dependencies=[Depends(basic_auth)])
@@ -45,6 +49,12 @@ class HistoryResponse(BaseModel):
 
 class LogsResponse(BaseModel):
     logs: list
+
+
+class SchedulerConfigPayload(BaseModel):
+    enabled: bool
+    cron: str
+    description: str = ""
 
 
 # --- Task triggering ---
@@ -92,12 +102,12 @@ async def trigger_scan(
     incremental: bool = True,
     background_tasks: BackgroundTasks = None
 ):
-    """Trigger a media scan."""
+    """Trigger scan + STRM generation for the current source directory."""
     task_id = task_state.start_task("scan")
-    task_state.update(task_id, message="Queued for scanning...")
-    asyncio.create_task(_run_scan_bg(task_id, source_dir, None, incremental))
+    task_state.update(task_id, message="Queued for scan and generation...")
+    asyncio.create_task(_run_generate_bg(task_id, source_dir, None, incremental))
     return TriggerResponse(ok=True, task_id=task_id,
-                            message=f"Scan started (task {task_id})")
+                            message=f"Scan and generation started (task {task_id})")
 
 
 @router.post("/api/tasks/generate", response_model=TriggerResponse)
@@ -213,6 +223,31 @@ async def set_config(payload: ConfigSetRequest, db: Session = Depends(get_db)):
     return {"ok": True, "key": payload.key, "value": payload.value}
 
 
+@router.get("/api/scheduler")
+async def get_scheduler(db: Session = Depends(get_db)):
+    """Get scheduler configuration."""
+    return get_scheduler_config(db)
+
+
+@router.post("/api/scheduler")
+async def set_scheduler(payload: SchedulerConfigPayload, db: Session = Depends(get_db)):
+    """Persist scheduler configuration."""
+    cron = payload.cron.strip()
+    if not cron:
+        raise HTTPException(status_code=400, detail="cron is required")
+
+    saved = save_scheduler_config(
+        db,
+        {
+            "enabled": payload.enabled,
+            "cron": cron,
+            "description": payload.description,
+        },
+    )
+    log_op("info", "config", f"Scheduler config updated: enabled={saved['enabled']}, cron={saved['cron']}")
+    return {"ok": True, **saved}
+
+
 @router.get("/api/stats")
 async def get_stats(db: Session = Depends(get_db)):
     """Get overall statistics."""
@@ -226,3 +261,85 @@ async def get_stats(db: Session = Depends(get_db)):
         "source_dir": str(SOURCE_DIR),
         "output_dir": str(OUTPUT_DIR),
     }
+
+
+@router.get("/api/emby/stats")
+async def get_emby_stats():
+    """Fetch Emby library statistics."""
+    base_url = os.getenv("EMBY_URL", "").rstrip("/")
+    api_key = os.getenv("EMBY_API_KEY", "")
+    recent_range_days = int(os.getenv("EMBY_RECENT_DAYS", "7"))
+
+    if not base_url or not api_key:
+        return {
+            "connected": False,
+            "message": "尚未配置 Emby 连接信息",
+            "movie_count": 0,
+            "series_count": 0,
+            "total_count": 0,
+            "recent_added_count": 0,
+            "recent_range_days": recent_range_days,
+            "last_updated_at": None,
+        }
+
+    def fetch_json(path: str, params: dict | None = None):
+        query = urlencode(params or {})
+        url = f"{base_url}{path}"
+        if query:
+            url = f"{url}?{query}"
+        req = Request(url, headers={"X-Emby-Token": api_key})
+        with urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        counts = fetch_json("/Items/Counts")
+        movie_count = counts.get("MovieCount", 0)
+        series_count = counts.get("SeriesCount", 0)
+        total_count = movie_count + series_count
+
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=recent_range_days)
+        latest = fetch_json(
+            "/Items",
+            {
+                "Recursive": "true",
+                "IncludeItemTypes": "Movie,Series",
+                "SortBy": "DateCreated",
+                "SortOrder": "Descending",
+                "Limit": "200",
+                "Fields": "DateCreated",
+            },
+        )
+        recent_added_count = 0
+        for item in latest.get("Items", []):
+            date_created = item.get("DateCreated")
+            if not date_created:
+                continue
+            try:
+                created_at = datetime.datetime.fromisoformat(date_created.replace("Z", "+00:00"))
+                if created_at >= cutoff:
+                    recent_added_count += 1
+            except Exception:
+                continue
+
+        return {
+            "connected": True,
+            "message": "获取 Emby 统计成功",
+            "movie_count": movie_count,
+            "series_count": series_count,
+            "total_count": total_count,
+            "recent_added_count": recent_added_count,
+            "recent_range_days": recent_range_days,
+            "last_updated_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        }
+    except Exception as e:
+        log_op("warning", "emby", f"Emby stats fetch failed: {e}")
+        return {
+            "connected": False,
+            "message": f"获取 Emby 统计失败: {e}",
+            "movie_count": 0,
+            "series_count": 0,
+            "total_count": 0,
+            "recent_added_count": 0,
+            "recent_range_days": recent_range_days,
+            "last_updated_at": None,
+        }

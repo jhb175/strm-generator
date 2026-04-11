@@ -47,24 +47,13 @@ def _build_strm_path(item: MediaItem, output_dir: Path = None) -> Path:
 
 
 def _build_media_ref_path(item: MediaItem) -> str:
-    """
-    Build the absolute path reference that goes inside the .strm file.
-    e.g. /media/电视剧/国产剧/恶作剧之吻 (2005)/Season 2/恶作剧之吻 - S02E09 - 第 9 集.mp4
-    """
-    if item.media_type == 'movie':
-        year_str = f" ({item.year})" if item.year else ""
-        return f"{MEDIA_PREFIX}/电影/{item.title}{year_str}/{item.path.name}"
-
-    elif item.media_type == 'episode':
-        year_str = f" ({item.year})" if item.year else ""
-        cat = item.category or "其他"
-        season_str = f"Season {item.season}"
-        ep_num = f"S{item.season:02d}E{item.episode:02d}"
-        ep_title = item.episode_title or f"第 {item.episode} 集"
-        return (f"{MEDIA_PREFIX}/电视剧/{cat}/{item.title}{year_str}/{season_str}/"
-                f"{item.title} - {ep_num} - {ep_title}.mp4")
-
-    raise ValueError(f"Unknown media type: {item.media_type}")
+    """Build the absolute media path to write inside the .strm file."""
+    source_root = Path(SOURCE_DIR)
+    try:
+        relative_path = item.path.relative_to(source_root).as_posix()
+    except ValueError:
+        relative_path = item.path.name
+    return f"{MEDIA_PREFIX}/{relative_path}"
 
 
 def _file_hash(path: Path) -> str:

@@ -9,16 +9,20 @@ from app.config import SOURCE_DIR
 
 # Regex patterns for episode parsing
 EPISODE_PATTERNS = [
-    # "恶作剧之吻 - S02E09 - 第 9 集.mp4"
-    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,3})\s*-\s*(.+)\.mp4$', re.IGNORECASE),
-    # "Show - 1x09 - Title.mp4"
-    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,3})\s*-\s*(.+)\.mp4$', re.IGNORECASE),
-    # "Show S01E01.mp4"
-    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,3})\.mp4$', re.IGNORECASE),
+    # "恶作剧之吻 - S02E09 - 第 9 集.mp4/.mkv"
+    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,3})\s*-\s*(.+)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
+    # "Show - 1x09 - Title.mp4/.mkv"
+    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,3})\s*-\s*(.+)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
+    # "Show S01E01.mp4/.mkv"
+    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,3})\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
+    # 使用 stem 匹配，无扩展名
+    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,3})\s*-\s*(.+)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,3})\s*-\s*(.+)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,3})$', re.IGNORECASE),
 ]
 
-# Regex for movie: "Title (Year).mp4"
-MOVIE_PATTERN = re.compile(r'^(.+?)\s*\((\d{4})\)\.mp4$', re.IGNORECASE)
+# Regex for movie: "Title (Year).mp4/.mkv"
+MOVIE_PATTERN = re.compile(r'^(.+?)\s*\((\d{4})\)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE)
 
 # Media extensions to scan
 MEDIA_EXTS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv'}
@@ -88,28 +92,29 @@ def scan_source_dir(source_dir: Path = None) -> tuple[list[MediaItem], list[str]
         errors.append(f"Source dir does not exist: {source_dir}")
         return items, errors
 
-    # Walk movies
+    # Walk movies: /电影/[分类]/[片名 (年份)]/[视频文件]
     movies_root = source_dir / "电影"
     if movies_root.exists():
-        for folder in sorted(movies_root.iterdir()):
-            if not folder.is_dir():
+        for category_folder in sorted(movies_root.iterdir()):
+            if not category_folder.is_dir():
                 continue
-            title = _guess_title_folder(folder.name)
-            # Extract year from folder name: "Title (Year)"
-            year = None
-            m = re.match(r'.+\((\d{4})\)', folder.name)
-            if m:
-                year = int(m.group(1))
-            # Find media files
-            for f in sorted(folder.iterdir()):
-                if f.suffix.lower() not in MEDIA_EXTS:
+            for folder in sorted(category_folder.iterdir()):
+                if not folder.is_dir():
                     continue
-                items.append(MediaItem(
-                    path=f,
-                    media_type='movie',
-                    title=title,
-                    year=year,
-                ))
+                title = _guess_title_folder(folder.name)
+                year = None
+                m = re.match(r'.+\((\d{4})\)', folder.name)
+                if m:
+                    year = int(m.group(1))
+                for f in sorted(folder.iterdir()):
+                    if f.suffix.lower() not in MEDIA_EXTS:
+                        continue
+                    items.append(MediaItem(
+                        path=f,
+                        media_type='movie',
+                        title=title,
+                        year=year,
+                    ))
 
     # Walk TV shows
     shows_root = source_dir / "电视剧"
@@ -156,7 +161,7 @@ def scan_source_dir(source_dir: Path = None) -> tuple[list[MediaItem], list[str]
                                 matched_title = m.group(1).strip()
                                 season = int(m.group(2))
                                 episode = int(m.group(3))
-                                if len(m.groups) >= 4:
+                                if len(m.groups()) >= 4:
                                     episode_title = m.group(4).strip()
                                 break
                         if episode is None:

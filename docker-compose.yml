@@ -8,7 +8,7 @@ services:
       - "3011:3011"
     volumes:
       - /data/clouddrive/gdrive:/data/clouddrive/gdrive:ro
-      - strm-output:/app/output
+      - /opt/strm_yesy/output:/app/output
       - strm-data:/app/data
     environment:
       - STRM_SOURCE_DIR=/data/clouddrive/gdrive
@@ -16,6 +16,9 @@ services:
       - STRM_BASE_DIR=/app/data
       - STRS_AUTH_USER=jdyyds
       - STRS_AUTH_PASS=f15015699065
+      - EMBY_URL=http://188.165.244.137:8096
+      - EMBY_API_KEY=c697ac73dabb4e94aa0ac447409f7569
+      - EMBY_RECENT_DAYS=7
     restart: unless-stopped
     networks:
       - strm-net
@@ -36,5 +39,4 @@ networks:
     driver: bridge
 
 volumes:
-  strm-output:
   strm-data:
