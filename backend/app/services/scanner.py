@@ -10,15 +10,15 @@ from app.config import SOURCE_DIR
 # Regex patterns for episode parsing
 EPISODE_PATTERNS = [
     # "恶作剧之吻 - S02E09 - 第 9 集.mp4/.mkv"
-    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,3})\s*-\s*(.+)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,4})\s*-\s*(.+)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
     # "Show - 1x09 - Title.mp4/.mkv"
-    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,3})\s*-\s*(.+)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,4})\s*-\s*(.+)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
     # "Show S01E01.mp4/.mkv"
-    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,3})\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,4})\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE),
     # 使用 stem 匹配，无扩展名
-    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,3})\s*-\s*(.+)$', re.IGNORECASE),
-    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,3})\s*-\s*(.+)$', re.IGNORECASE),
-    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,3})$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*-\s*S(\d{2})E(\d{2,4})\s*-\s*(.+)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*-\s*(\d{1,2})x(\d{2,4})\s*-\s*(.+)$', re.IGNORECASE),
+    re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,4})$', re.IGNORECASE),
 ]
 
 # Regex for movie: "Title (Year).mp4/.mkv"
