@@ -8,7 +8,7 @@ services:
       - "3011:3011"
     volumes:
       - /data/clouddrive/gdrive:/data/clouddrive/gdrive:ro
-      - /opt/strm_yesy/output:/app/output
+      - /opt/strm:/app/output
       - strm-data:/app/data
     environment:
       - STRM_SOURCE_DIR=/data/clouddrive/gdrive
