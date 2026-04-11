@@ -1,87 +1,150 @@
-# STRM Generator
+# YingLink / STRM Media Bridge
 
-## Project Introduction
-STRM Generator is an automated tool built with FastAPI and React, designed to scan cloud drives or local storage for media files and generate corresponding `.strm` stub files. This allows for seamless streaming in media servers like Emby, Jellyfin, or Plex, saving massive amounts of local storage space.
+## Overview
+YingLink (STRM Media Bridge) is a **FastAPI + React + TypeScript** project for scanning media source folders, generating `.strm` files, and serving them to media servers such as **Emby**, **Jellyfin**, and **Plex**.
+
+The project currently includes:
+- Integrated frontend + backend deployment via Docker Compose
+- Chinese web UI
+- HTTP Basic Auth protection
+- Emby statistics dashboard
+- Task center with manual execution feedback
+- Scheduler configuration support
+- STRM output to a standard media library path
 
 ## Features
-- **Automated Scanning**: Deeply traverses specified directory structures to automatically discover media files (e.g., mp4, mkv, avi).
-- **Batch STRM Generation**: Rapidly generates structurally consistent `.strm` files for massive media libraries.
-- **Intuitive Web UI**: Offers a modern, responsive management interface to monitor generation progress and status at any time.
-- **Directory Mapping Support**: Flexibly maps cloud drive mount paths to externally accessible direct links or playback paths.
-- **Lightweight & Easy Deployment**: Decoupled frontend and backend architecture, providing a one-click deployment solution via Docker Compose.
+- **Automatic media scanning** for movies and TV shows
+- **Batch STRM generation** for large libraries
+- **Modern web UI** for configuration and monitoring
+- **Task center** with execution status, history, and logs
+- **Scheduler support** using Cron expressions
+- **Emby statistics** including movies, series, total items, and recent additions
+- **HTTP Basic Auth** without introducing a separate user system
 
-## Directory Structure
-```text
-strm-project/
-├── backend/            # FastAPI backend service
-├── frontend/           # React + TypeScript frontend UI
-├── docker-compose.yml  # Docker Compose configuration file
-└── README.md           # Project documentation
-```
+## Tech Stack
+- Backend: FastAPI
+- Frontend: React + TypeScript + Vite
+- Deployment: Docker Compose
+- Auth: HTTP Basic Auth
 
 ## Quick Start
 
-### Prerequisites
-- Docker and Docker Compose installed
+### Requirements
+- Docker
+- Docker Compose
+- A mounted media source directory
 
-### One-Click Start
+### Start the project
 ```bash
-git clone <repository_url>
-cd strm-project
-docker-compose up -d
+git clone https://github.com/jhb175/strm-generator.git
+cd strm-generator
+docker compose up -d --build
 ```
 
-### Access URLs
-- Frontend Management UI: `http://localhost:8888`
+### Default URLs
+- Frontend: `http://localhost:8888`
 - Backend API: `http://localhost:3011`
 
-## Directory Mapping Guide
+## Recommended Path Mapping
 
-| Mount Type | Container Path | Host Path | Description |
-| --- | --- | --- | --- |
-| Source Directory | `/data/clouddrive/gdrive` | Your cloud drive mount path | Location of actual media files |
-| Output Directory | `/opt/strm_yesy/output` | Your desired STRM output path | Directory read by media servers (e.g., Emby) |
+| Purpose | Host Path | Container Path |
+| --- | --- | --- |
+| Media source | `/data/clouddrive/gdrive` | `/data/clouddrive/gdrive` |
+| STRM output | `/opt/strm` | `/app/output` |
+| Emby media mount | `/data/clouddrive/gdrive` | `/media` |
+| Emby STRM library mount | `/opt/strm` | `/strm` |
 
-## STRM File Format Example
-A `.strm` file is essentially a plain text file containing the direct playback link or mount path of the actual media file.
+## STRM Content Format
+Generated `.strm` files contain absolute paths accessible inside the media server container, for example:
 
-**Example:**
-If the source file path is `/data/clouddrive/gdrive/Movies/Avatar.mkv`, the generated `Avatar.strm` file content might be:
 ```text
-http://your-direct-link-domain/Movies/Avatar.mkv
+/media/电影/外语电影/The Man from Earth (2007)/The Man from Earth (2007) - 1080p.mkv
 ```
-Or it may point directly to a local mount path (depending on your configuration).
 
-## API Endpoints
+This means your media server container must mount both:
+- `/strm` for reading `.strm` files
+- `/media` for reading the real media files
+
+## API Overview
 
 | Endpoint | Method | Description |
 | --- | --- | --- |
-| `/api/login` | POST | User login, retrieve Token |
-| `/api/scan` | POST | Trigger directory scan and STRM generation task |
-| `/api/status` | GET | Get progress and status of the current task |
-| `/api/config` | GET | Retrieve current system mapping configuration |
-| `/api/config` | PUT | Update system mapping configuration |
+| `/health` | GET | Health check (public) |
+| `/api/tasks/scan` | POST | Scan and generate STRM files |
+| `/api/tasks/generate` | POST | Run generation only |
+| `/api/tasks/status` | GET | Get current task status |
+| `/api/history` | GET | Get task history |
+| `/api/logs` | GET | Get logs |
+| `/api/config` | GET/POST | Read/save configuration |
+| `/api/scheduler` | GET/POST | Read/save scheduler config |
+| `/api/emby/stats` | GET | Get Emby statistics |
 
-## Configuration Guide
+## Scheduler
+The project supports saving Cron expressions for scheduled execution.
 
-### Environment Variables
-Can be configured by modifying `docker-compose.yml` or the `.env` file:
-- `SOURCE_DIR`: Media source directory (Default: `/data/clouddrive/gdrive`)
-- `OUTPUT_DIR`: STRM file output directory (Default: `/opt/strm_yesy/output`)
+Examples:
+- `0 * * * *` → run once every hour
+- `0 3 * * *` → run every day at 03:00
 
-### Default Credentials
-Upon the first startup, log in using the following default credentials:
-- **Username:** `admin`
-- **Password:** `strm2026`
-*(It is recommended to change the default password immediately after logging in)*
+## Security Notes
+To avoid exposing this service as an unprotected public tool, at least follow these recommendations:
+
+### 1. Change the default credentials
+Do not keep example credentials in production. Override them with environment variables:
+
+```bash
+STRS_AUTH_USER=your_user
+STRS_AUTH_PASS=your_strong_password
+```
+
+### 2. Do not expose the backend directly to the public internet
+Recommended options:
+- restrict to LAN only
+- place it behind a reverse proxy
+- limit source IP ranges
+- enable HTTPS if it is remotely accessible
+
+### 3. Keep media server mounts minimal
+Only mount what is needed:
+- `/strm`
+- `/media`
+
+Avoid exposing unnecessary host directories into containers.
+
+### 4. Never commit real secrets to GitHub
+Do not publish:
+- Emby API keys
+- real usernames or passwords
+- private domains or internal paths
+- SSH credentials or server access details
+
+### 5. Protect your ports with a firewall
+At minimum, review and restrict access to:
+- `8888`
+- `3011`
+- `8096`
+
+Allow only trusted sources whenever possible.
 
 ## FAQ
 
-**Q: What if the media server cannot recognize the generated STRM files?**
-A: Ensure the media server has read permissions for the `/opt/strm_yesy/output` directory, and the links within the STRM files are accessible by the media server.
+### Q1: Emby cannot recognize generated STRM files
+Check these two things first:
+1. Emby must mount `/strm`
+2. Emby must mount `/media`
 
-**Q: How do I rescan an updated directory?**
-A: Click the "Rescan" button in the Web UI, or send a `POST /api/scan` request via the API.
+Also confirm that the path written inside the `.strm` file matches the real path visible inside the Emby container.
+
+### Q2: Generation succeeded but the media library did not update
+This is usually not a STRM generation issue. In most cases, Emby just has not refreshed the library yet. Trigger a library refresh manually or rely on the built-in scheduler.
+
+### Q3: Why were some very high episode numbers missing before?
+Older parsing logic only handled shorter episode numbers. The current version supports 4-digit episode numbers, such as:
+- `S01E1046`
+- `S01E1323`
+
+## Repository
+- GitHub: https://github.com/jhb175/strm-generator
 
 ## License
-MIT License.
+MIT
