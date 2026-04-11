@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    container_name: strm-generator-backend
+    ports:
+      - "3011:3011"
+    volumes:
+      - /data/clouddrive/gdrive:/data/clouddrive/gdrive:ro
+      - strm-output:/app/output
+      - strm-data:/app/data
+    environment:
+      - STRM_SOURCE_DIR=/data/clouddrive/gdrive
+      - STRM_OUTPUT_DIR=/app/output
+      - STRM_BASE_DIR=/app/data
+    restart: unless-stopped
+    networks:
+      - strm-net
+
+  frontend:
+    build: ./frontend
+    container_name: strm-generator-frontend
+    ports:
+      - "8888:80"
+    restart: unless-stopped
+    networks:
+      - strm-net
+    depends_on:
+      - backend
+
+networks:
+  strm-net:
+    driver: bridge
+
+volumes:
+  strm-output:
+  strm-data:
