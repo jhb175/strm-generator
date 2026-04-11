@@ -1,87 +1,149 @@
-# STRM Generator
+# 映链 / STRM Media Bridge
 
 ## 项目介绍
-STRM Generator 是一个基于 FastAPI 和 React 开发的自动化工具，用于扫描云盘或本地存储的媒体文件，并生成对应的 `.strm` 存根文件，以便在 Emby、Jellyfin 或 Plex 等媒体服务器中进行流式播放，从而节省大量本地存储空间。
+映链（STRM Media Bridge）是一个基于 **FastAPI + React + TypeScript** 的 STRM 生成与管理工具，用于扫描媒体源目录、生成 `.strm` 文件，并接入 Emby / Jellyfin / Plex 等媒体服务器。
+
+当前项目已完成：
+- 前后端一体化 Docker Compose 部署
+- 中文化管理界面
+- HTTP Basic Auth 保护
+- Emby 统计展示
+- 任务中心与定时任务配置
+- STRM 输出到标准媒体库目录
 
 ## 功能特性
-- **自动化扫描**：支持深度遍历指定目录结构，自动发现媒体文件（如 mp4, mkv, avi 等）。
-- **批量生成 STRM**：快速为海量媒体库生成结构一致的 `.strm` 文件。
-- **直观的 Web UI**：提供现代化的响应式管理界面，随时监控生成进度和状态。
-- **目录映射支持**：支持将云盘挂载路径灵活映射为外部可访问的直链或播放路径。
-- **轻量级且易部署**：前后端分离架构，提供 Docker Compose 一键部署方案。
+- **自动扫描媒体库**：递归扫描电影 / 电视剧目录
+- **批量生成 STRM**：生成标准化 `.strm` 文件结构
+- **中文管理界面**：适合日常维护与状态查看
+- **任务中心**：支持手动执行、日志查看、执行反馈
+- **定时任务设置**：支持按 Cron 表达式定时执行
+- **Emby 统计**：展示电影、剧集、总量、最近新增
+- **Basic Auth 保护**：无需额外用户系统，直接保护后台与 API
 
-## 目录结构
-```text
-strm-project/
-├── backend/            # FastAPI 后端服务
-├── frontend/           # React + TypeScript 前端界面
-├── docker-compose.yml  # Docker 容器编排文件
-└── README.md           # 项目文档
-```
+## 技术栈
+- Backend: FastAPI
+- Frontend: React + TypeScript + Vite
+- Deploy: Docker Compose
+- Auth: HTTP Basic Auth
 
 ## 快速开始
 
 ### 前置要求
-- 已安装 Docker 和 Docker Compose
+- Docker
+- Docker Compose
+- 已有媒体源目录
 
 ### 一键启动
 ```bash
-git clone <repository_url>
-cd strm-project
-docker-compose up -d
+git clone https://github.com/jhb175/strm-generator.git
+cd strm-generator
+docker compose up -d --build
 ```
 
-### 访问地址
-- 前端管理界面：`http://localhost:8888`
-- 后端 API 接口：`http://localhost:3011`
+### 默认访问地址
+- 前端：`http://localhost:8888`
+- 后端：`http://localhost:3011`
 
-## 目录映射说明
+## 当前推荐目录映射
 
-| 挂载类型 | 容器内路径 | 宿主机路径 | 说明 |
-| --- | --- | --- | --- |
-| 源文件目录 | `/data/clouddrive/gdrive` | 你的云盘挂载路径 | 存放实际媒体文件的位置 |
-| 输出目录 | `/opt/strm_yesy/output` | 你期望生成 STRM 的路径 | 媒体服务器（如 Emby）读取的目录 |
-
-## STRM 文件格式说明
-`.strm` 文件本质上是一个纯文本文件，内部包含实际媒体文件的直接播放链接或挂载路径。
-
-**示例：**
-如果源文件路径为 `/data/clouddrive/gdrive/Movies/Avatar.mkv`，生成的 `Avatar.strm` 文件内容可能是：
-```text
-http://你的直链域名/Movies/Avatar.mkv
-```
-或直接指向本地挂载路径（取决于配置）。
-
-## API 接口列表
-
-| 接口路径 | 方法 | 描述 |
+| 用途 | 宿主机路径 | 容器内路径 |
 | --- | --- | --- |
-| `/api/login` | POST | 用户登录，获取 Token |
-| `/api/scan` | POST | 触发目录扫描和 STRM 生成任务 |
-| `/api/status` | GET | 获取当前任务的进度和状态 |
-| `/api/config` | GET | 获取系统当前映射配置 |
-| `/api/config` | PUT | 更新系统映射配置 |
+| 媒体源目录 | `/data/clouddrive/gdrive` | `/data/clouddrive/gdrive` |
+| STRM 输出目录 | `/opt/strm` | `/app/output` |
+| Emby 媒体源挂载 | `/data/clouddrive/gdrive` | `/media` |
+| Emby STRM 库挂载 | `/opt/strm` | `/strm` |
 
-## 配置说明
+## STRM 内容格式
+当前 `.strm` 文件内容为容器内可访问的绝对路径，例如：
 
-### 环境变量
-可以通过修改 `docker-compose.yml` 或 `.env` 文件来配置：
-- `SOURCE_DIR`：媒体文件源目录（默认：`/data/clouddrive/gdrive`）
-- `OUTPUT_DIR`：STRM 文件输出目录（默认：`/opt/strm_yesy/output`）
+```text
+/media/电影/外语电影/彗星来的那一夜 (2014)/彗星来的那一夜 (2014) - 1080p.mkv
+```
 
-### 默认账号密码
-系统首次启动后，使用以下默认凭据登录：
-- **账号：** `admin`
-- **密码：** `strm2026`
-*(建议登录后尽快修改默认密码)*
+这要求你的媒体服务器（如 Emby）必须同时挂载：
+- `/strm`：用于读取 `.strm` 文件
+- `/media`：用于访问真实媒体文件
+
+## API 概览
+
+| 路径 | 方法 | 说明 |
+| --- | --- | --- |
+| `/health` | GET | 健康检查（公开） |
+| `/api/tasks/scan` | POST | 扫描并生成 STRM |
+| `/api/tasks/generate` | POST | 仅执行生成任务 |
+| `/api/tasks/status` | GET | 查看任务状态 |
+| `/api/history` | GET | 查看历史任务 |
+| `/api/logs` | GET | 查看日志 |
+| `/api/config` | GET/POST | 获取/保存配置 |
+| `/api/scheduler` | GET/POST | 获取/保存定时任务配置 |
+| `/api/emby/stats` | GET | 查看 Emby 统计 |
+
+## 定时任务
+当前项目支持保存 Cron 表达式。
+
+示例：
+- `0 * * * *` → 每小时整点执行一次
+- `0 3 * * *` → 每天凌晨 3 点执行一次
+
+## 安全说明
+为了避免把这个项目直接暴露成“裸服务”，建议至少做到以下几点：
+
+### 1. 修改默认认证信息
+请不要继续使用仓库中的示例凭据。通过环境变量覆盖：
+
+```bash
+STRS_AUTH_USER=your_user
+STRS_AUTH_PASS=your_strong_password
+```
+
+### 2. 不要把后端直接暴露到公网
+建议：
+- 仅内网访问
+- 或放在反向代理后面
+- 或限制来源 IP
+- 或至少叠加 HTTPS
+
+### 3. Emby / 媒体服务器挂载必须最小化
+只挂载必要目录：
+- `/strm`
+- `/media`
+
+避免直接把更多宿主机目录暴露给容器。
+
+### 4. GitHub 仓库不要提交真实密钥和真实密码
+请确认以下敏感信息不要进入公开仓库：
+- Emby API Key
+- 真实账号密码
+- 私有域名 / 私有路径
+- 服务器 SSH 信息
+
+### 5. 建议配合防火墙
+至少限制：
+- `8888`
+- `3011`
+- `8096`
+
+只允许你自己的可信来源访问。
 
 ## 常见问题
 
-**Q: 生成的 STRM 文件媒体服务器无法识别怎么办？**
-A: 请确保媒体服务器具有 `/opt/strm_yesy/output` 目录的读取权限，并且 STRM 文件内的链接可被媒体服务器访问。
+### Q1：Emby 无法识别 STRM 怎么办？
+请检查两件事：
+1. Emby 是否挂载了 `/strm`
+2. Emby 是否挂载了 `/media`
 
-**Q: 如何重新扫描已更新的目录？**
-A: 在 Web UI 界面点击“重新扫描”按钮，或通过 API 发送 `POST /api/scan` 请求。
+并确认 `.strm` 文件内部路径和 Emby 容器内真实路径一致。
+
+### Q2：为什么生成成功但媒体库没更新？
+通常不是生成问题，而是 Emby 尚未刷新媒体库。请手动刷新，或通过项目的定时任务持续更新。
+
+### Q3：为什么有些高集数剧集之前没生成？
+旧版本对 4 位 episode 编号支持不足。当前版本已修复，例如：
+- `S01E1046`
+- `S01E1323`
+
+## 仓库地址
+- GitHub: https://github.com/jhb175/strm-generator
 
 ## License
-MIT License.
+MIT
