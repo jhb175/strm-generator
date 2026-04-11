@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, BackgroundTasks
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth import basic_auth
 from app.config import SOURCE_DIR, OUTPUT_DIR
 from app.db import get_db
 from app.models import TaskRun, OpLog, Config, StrmFile
@@ -17,7 +18,7 @@ from app.services.generator import run_scan, run_generate, run_cleanup
 from app.services.websocket import ws_manager
 
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(basic_auth)])
 
 
 # --- Request/Response Models ---

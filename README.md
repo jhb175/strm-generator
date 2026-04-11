@@ -1,139 +1,87 @@
 # STRM Generator
 
-一个用于将 rclone 挂载的 Google Drive 媒体目录生成 `.strm` 文件的工具，供 Emby/Jellyfin/Plex 等媒体服务器扫描刮削。
+## 项目介绍
+STRM Generator 是一个基于 FastAPI 和 React 开发的自动化工具，用于扫描云盘或本地存储的媒体文件，并生成对应的 `.strm` 存根文件，以便在 Emby、Jellyfin 或 Plex 等媒体服务器中进行流式播放，从而节省大量本地存储空间。
 
 ## 功能特性
-
-- **媒体扫描**：自动识别电影和剧集，按目录结构提取元数据
-- **STRM 生成**：按 Emby 期望的格式生成 `.strm` 引用文件
-- **增量更新**：仅处理新增或变化的媒体，跳过未变化文件
-- **孤立清理**：识别并清理源文件已删除的 orphaned STRM
-- **Web UI**：深色主题管理界面，支持任务进度实时推送
-- **Docker 部署**：一键启动，不依赖宿主机环境
+- **自动化扫描**：支持深度遍历指定目录结构，自动发现媒体文件（如 mp4, mkv, avi 等）。
+- **批量生成 STRM**：快速为海量媒体库生成结构一致的 `.strm` 文件。
+- **直观的 Web UI**：提供现代化的响应式管理界面，随时监控生成进度和状态。
+- **目录映射支持**：支持将云盘挂载路径灵活映射为外部可访问的直链或播放路径。
+- **轻量级且易部署**：前后端分离架构，提供 Docker Compose 一键部署方案。
 
 ## 目录结构
-
-```
+```text
 strm-project/
-├── docker-compose.yml   # 一键部署配置
-├── backend/             # FastAPI 后端
-│   ├── app/
-│   ├── Dockerfile
-│   ├── requirements.txt
-│   └── README.md
-├── frontend/           # React 前端
-│   ├── src/
-│   ├── Dockerfile
-│   ├── nginx.conf
-│   └── package.json
+├── backend/            # FastAPI 后端服务
+├── frontend/           # React + TypeScript 前端界面
+├── docker-compose.yml  # Docker 容器编排文件
+└── README.md           # 项目文档
 ```
 
 ## 快速开始
 
 ### 前置要求
+- 已安装 Docker 和 Docker Compose
 
-- Docker & Docker Compose
-- rclone 挂载的 Google Drive（或任何兼容的网盘挂载）
-- 媒体目录结构参考：
-  ```
-  /data/clouddrive/gdrive/
-  ├── 电影/
-  │   └── Avatar (2009)/
-  │       └── Avatar.mp4
-  └── 电视剧/
-      └── Breaking Bad (2008)/
-          └── Season 1/
-              └── Breaking Bad - S01E01 - Pilot.mp4
-  ```
-
-### 启动
-
+### 一键启动
 ```bash
-git clone <your-repo-url>
+git clone <repository_url>
 cd strm-project
-
-# 编辑 docker-compose.yml 中的宿主机路径映射
-# - /data/clouddrive/gdrive  → 你的网盘挂载路径
-# - strm-output              → STRM 文件输出目录
-
-docker-compose up -d --build
+docker-compose up -d
 ```
 
-访问 **http://你的IP:8888**
+### 访问地址
+- 前端管理界面：`http://localhost:8888`
+- 后端 API 接口：`http://localhost:3011`
 
-### 端口
+## 目录映射说明
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| 前端 | 8888 | Web 管理界面 |
-| 后端 | 3011 | REST API + WebSocket |
+| 挂载类型 | 容器内路径 | 宿主机路径 | 说明 |
+| --- | --- | --- | --- |
+| 源文件目录 | `/data/clouddrive/gdrive` | 你的云盘挂载路径 | 存放实际媒体文件的位置 |
+| 输出目录 | `/opt/strm_yesy/output` | 你期望生成 STRM 的路径 | 媒体服务器（如 Emby）读取的目录 |
 
-### 目录映射
+## STRM 文件格式说明
+`.strm` 文件本质上是一个纯文本文件，内部包含实际媒体文件的直接播放链接或挂载路径。
 
-| 宿主机路径 | 容器内路径 | 说明 |
-|------------|-----------|------|
-| `/data/clouddrive/gdrive` | `/data/clouddrive/gdrive` | 媒体源目录（只读） |
-| `strm-output` volume | `/app/output` | STRM 文件输出目录 |
-| `strm-data` volume | `/app/data` | 数据库和日志 |
-
-## STRM 文件格式
-
-**内容示例：**
+**示例：**
+如果源文件路径为 `/data/clouddrive/gdrive/Movies/Avatar.mkv`，生成的 `Avatar.strm` 文件内容可能是：
+```text
+http://你的直链域名/Movies/Avatar.mkv
 ```
-/media/电视剧/国产剧/恶作剧之吻 (2005)/Season 2/恶作剧之吻 - S02E09 - 第 9 集.mp4
-```
+或直接指向本地挂载路径（取决于配置）。
 
-**生成的目录结构：**
-```
-strm-output/
-├── 电影/
-│   └── Avatar (2009).strm        → 内容指向源文件
-└── 电视剧/
-    └── 国产剧/
-        └── 恶作剧之吻 (2005)/
-            └── Season 2/
-                └── 恶作剧之吻 - S02E09 - 第 9 集.strm
-```
+## API 接口列表
 
-## API 接口
+| 接口路径 | 方法 | 描述 |
+| --- | --- | --- |
+| `/api/login` | POST | 用户登录，获取 Token |
+| `/api/scan` | POST | 触发目录扫描和 STRM 生成任务 |
+| `/api/status` | GET | 获取当前任务的进度和状态 |
+| `/api/config` | GET | 获取系统当前映射配置 |
+| `/api/config` | PUT | 更新系统映射配置 |
 
-| 接口 | 方法 | 说明 |
-|------|------|------|
-| `/api/tasks/scan` | POST | 触发媒体扫描 |
-| `/api/tasks/generate` | POST | 触发生成 STRM |
-| `/api/tasks/cleanup/execute` | POST | 执行孤立清理 |
-| `/api/tasks/cleanup/preview` | GET | 预览待清理文件 |
-| `/api/tasks/status` | GET | 当前任务状态 |
-| `/api/history` | GET | 任务历史 |
-| `/api/logs` | GET | 操作日志 |
-| `/api/config` | GET/POST | 配置读取/保存 |
-| `/api/stats` | GET | 统计信息 |
-| `/ws` | WebSocket | 实时进度推送 |
+## 配置说明
 
-## 开发
+### 环境变量
+可以通过修改 `docker-compose.yml` 或 `.env` 文件来配置：
+- `SOURCE_DIR`：媒体文件源目录（默认：`/data/clouddrive/gdrive`）
+- `OUTPUT_DIR`：STRM 文件输出目录（默认：`/opt/strm_yesy/output`）
 
-### 手动启动后端
+### 默认账号密码
+系统首次启动后，使用以下默认凭据登录：
+- **账号：** `admin`
+- **密码：** `strm2026`
+*(建议登录后尽快修改默认密码)*
 
-```bash
-cd backend
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 3011
-```
+## 常见问题
 
-### 手动启动前端
+**Q: 生成的 STRM 文件媒体服务器无法识别怎么办？**
+A: 请确保媒体服务器具有 `/opt/strm_yesy/output` 目录的读取权限，并且 STRM 文件内的链接可被媒体服务器访问。
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## 技术栈
-
-- **后端**：Python 3.12 + FastAPI + SQLAlchemy + SQLite
-- **前端**：React 18 + TypeScript + Vite + TailwindCSS + Zustand
-- **部署**：Docker + Nginx
+**Q: 如何重新扫描已更新的目录？**
+A: 在 Web UI 界面点击“重新扫描”按钮，或通过 API 发送 `POST /api/scan` 请求。
 
 ## License
-
-MIT
+MIT License.
