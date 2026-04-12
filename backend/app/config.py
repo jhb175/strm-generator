@@ -13,6 +13,10 @@ SOURCE_DIR = Path(os.environ.get("STRM_SOURCE_DIR", "/data/clouddrive/gdrive"))
 # Output (where STRM files are written)
 OUTPUT_DIR = Path(os.environ.get("STRM_OUTPUT_DIR", "/opt/strm_yesy/output"))
 
+# Path prefix written inside generated .strm files.
+# Must match the media path visible to Emby/Jellyfin/Plex.
+MEDIA_PREFIX = os.environ.get("STRM_MEDIA_PREFIX", "/media").rstrip("/") or "/media"
+
 # Database
 DB_PATH = DATA_DIR / "strm.db"
 

@@ -6,17 +6,12 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from app.config import OUTPUT_DIR, SOURCE_DIR
+from app.config import OUTPUT_DIR, SOURCE_DIR, MEDIA_PREFIX
 from app.db import SessionLocal
 from app.models import StrmFile
 from app.services.scanner import MediaItem, scan_source_dir
 from app.services.state import task_state, log_op
 from app.services.websocket import ws_manager
-
-
-# The media reference path prefix inside the STRM file.
-# e.g. /media/电视剧/国产剧/恶作剧之吻 (2005)/Season 2/恶作剧之吻 - S02E09 - 第 9 集.mp4
-MEDIA_PREFIX = "/media"
 
 
 def _build_strm_path(item: MediaItem, output_dir: Path = None) -> Path:
@@ -32,7 +27,8 @@ def _build_strm_path(item: MediaItem, output_dir: Path = None) -> Path:
     if item.media_type == 'movie':
         year_str = f" ({item.year})" if item.year else ""
         strm_name = f"{item.title}{year_str}.strm"
-        return output_dir / "电影" / strm_name
+        cat = item.category or "未分类电影"
+        return output_dir / "电影" / cat / f"{item.title}{year_str}" / strm_name
 
     elif item.media_type == 'episode':
         year_str = f" ({item.year})" if item.year else ""
@@ -53,7 +49,7 @@ def _build_media_ref_path(item: MediaItem) -> str:
         relative_path = item.path.relative_to(source_root).as_posix()
     except ValueError:
         relative_path = item.path.name
-    return f"{MEDIA_PREFIX}/{relative_path}"
+    return f"{MEDIA_PREFIX}/{relative_path.lstrip('/')}"
 
 
 def _file_hash(path: Path) -> str:
@@ -186,29 +182,26 @@ async def run_generate(task_id: str, source_dir: Path = None,
                                    message=f"Done! Created {created}, skipped {skipped}")
 
 
-async def run_cleanup(task_id: str, output_dir: Path = None,
-                       dry_run: bool = True):
-    """Remove orphaned STRM files (STRMs pointing to missing source files)."""
+async def _cleanup_orphans_core(output_dir: Path = None, dry_run: bool = True,
+                                progress_task_id: str | None = None):
     if output_dir is None:
         output_dir = OUTPUT_DIR
     output_dir = Path(output_dir)
 
-    await ws_manager.push_progress(task_id, "cleanup", "running", message="Scanning for orphaned STRMs...")
-    task_state.update(task_id, message="Scanning for orphaned STRMs...")
-
     db = SessionLocal()
     deleted = 0
     orphans: list[str] = []
+    total = 0
     try:
         all_strms = db.query(StrmFile).all()
         total = len(all_strms)
-        task_state.update(task_id, total=total)
+        if progress_task_id:
+            task_state.update(progress_task_id, total=total)
 
         for i, rec in enumerate(all_strms):
             strm_path = Path(rec.strm_path)
             source_path = Path(rec.source_path)
 
-            # Check if source file still exists
             if not source_path.exists():
                 orphans.append(str(strm_path))
                 if not dry_run:
@@ -220,30 +213,45 @@ async def run_cleanup(task_id: str, output_dir: Path = None,
                 else:
                     log_op("info", "cleanup", f"Would delete orphaned STRM: {strm_path}")
 
-            task_state.update(task_id, processed=i + 1, deleted_files=deleted,
-                              message=f"Checked {i+1}/{total}: found {len(orphans)} orphans")
-            if i % 20 == 0:
-                await ws_manager.push_progress(task_id, "cleanup", "running",
-                                               total=total, processed=i + 1,
-                                               deleted_files=deleted,
-                                               orphans_found=len(orphans),
-                                               message=f"Checked {i+1}/{total}...")
+            if progress_task_id:
+                task_state.update(progress_task_id, processed=i + 1, deleted_files=deleted,
+                                  message=f"Checked {i+1}/{total}: found {len(orphans)} orphans")
+                if i % 20 == 0:
+                    await ws_manager.push_progress(progress_task_id, "cleanup", "running",
+                                                   total=total, processed=i + 1,
+                                                   deleted_files=deleted,
+                                                   orphans_found=len(orphans),
+                                                   message=f"Checked {i+1}/{total}...")
         db.commit()
+        return {"deleted": deleted, "orphans": orphans, "total": total, "dry_run": dry_run}
+    finally:
+        db.close()
+
+
+async def run_cleanup(task_id: str, output_dir: Path = None,
+                       dry_run: bool = True):
+    """Remove orphaned STRM files (STRMs pointing to missing source files)."""
+    if output_dir is None:
+        output_dir = OUTPUT_DIR
+    output_dir = Path(output_dir)
+
+    await ws_manager.push_progress(task_id, "cleanup", "running", message="Scanning for orphaned STRMs...")
+    task_state.update(task_id, message="Scanning for orphaned STRMs...")
+
+    try:
+        result = await _cleanup_orphans_core(output_dir=output_dir, dry_run=dry_run, progress_task_id=task_id)
     except Exception as e:
-        db.rollback()
         log_op("error", "cleanup", f"Cleanup failed: {e}")
         task_state.finish(task_id, status="failed", error_message=str(e))
         await ws_manager.push_progress(task_id, "cleanup", "failed", error_message=str(e))
         return
-    finally:
-        db.close()
 
     action = "Deleted" if not dry_run else "Would delete"
-    log_op("info", "cleanup", f"{action} {deleted} orphaned STRM files",
-           json.dumps({"deleted": deleted, "orphans": orphans[:100]}))
+    log_op("info", "cleanup", f"{action} {result['deleted']} orphaned STRM files",
+           json.dumps({"deleted": result['deleted'], "orphans": result['orphans'][:100]}))
     task_state.finish(task_id, status="success",
-                      detail=json.dumps({"deleted": deleted, "dry_run": dry_run}))
+                      detail=json.dumps({"deleted": result['deleted'], "dry_run": dry_run}))
     await ws_manager.push_progress(task_id, "cleanup", "success",
-                                   total=total, processed=total, deleted_files=deleted,
-                                   orphans_found=len(orphans),
-                                   message=f"Done! {action} {deleted} orphaned files")
+                                   total=result['total'], processed=result['total'], deleted_files=result['deleted'],
+                                   orphans_found=len(result['orphans']),
+                                   message=f"Done! {action} {result['deleted']} orphaned files")

@@ -30,5 +30,14 @@ export interface TaskHistoryEntry {
   task_type: string;
   start_time: string;
   end_time: string | null;
-  status: 'success' | 'failed' | 'running';
+  status: 'SUCCESS' | 'FAILED' | 'RUNNING' | string;
+}
+
+export interface EmbyStats {
+  movie_count: number;
+  series_count: number;
+  total_count: number;
+  recent_added_count: number;
+  recent_range_days: number;
+  last_updated_at: string;
 }

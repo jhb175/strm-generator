@@ -17,9 +17,10 @@ from app.config import SOURCE_DIR, OUTPUT_DIR
 from app.db import get_db
 from app.models import TaskRun, OpLog, Config, StrmFile
 from app.services.state import task_state, log_op
-from app.services.generator import run_scan, run_generate, run_cleanup
+from app.services.generator import run_scan, run_generate, run_cleanup, _cleanup_orphans_core
 from app.services.websocket import ws_manager
 from app.services.scheduler import get_scheduler_config, save_scheduler_config
+from app.services.runtime_scheduler import runtime_scheduler
 
 
 router = APIRouter(dependencies=[Depends(basic_auth)])
@@ -62,10 +63,17 @@ class SchedulerConfigPayload(BaseModel):
 async def _run_scan_bg(task_id: str, source_dir: str | None, output_dir: str | None,
                         incremental: bool):
     try:
-        await run_scan(task_id,
-                       source_dir=Path(source_dir) if source_dir else None,
-                       output_dir=Path(output_dir) if output_dir else None,
-                       incremental=incremental)
+        resolved_output = Path(output_dir) if output_dir else None
+        await ws_manager.push_progress(task_id, "scan", "running", message="Checking orphaned STRM files before scan...")
+        task_state.update(task_id, message="Checking orphaned STRM files before scan...")
+        cleanup_result = await _cleanup_orphans_core(output_dir=resolved_output, dry_run=False, progress_task_id=task_id)
+        log_op("info", "scan", f"Pre-scan orphan cleanup deleted {cleanup_result['deleted']} files")
+        await ws_manager.push_progress(task_id, "scan", "running", message=f"Pre-check complete: removed {cleanup_result['deleted']} invalid STRM files. Starting scan and generation...")
+        task_state.update(task_id, message=f"Pre-check complete: removed {cleanup_result['deleted']} invalid STRM files. Starting scan and generation...")
+        await run_generate(task_id,
+                           source_dir=Path(source_dir) if source_dir else None,
+                           output_dir=resolved_output,
+                           incremental=incremental)
     except Exception as e:
         log_op("error", "scan", f"Unexpected error: {e}")
         task_state.finish(task_id, status="FAILED", error_message=str(e))
@@ -167,8 +175,8 @@ async def get_history(limit: int = 20, offset: int = 0, db: Session = Depends(ge
             "id": r.id,
             "task_type": r.task_type,
             "status": r.status.upper() if r.status else None,
-            "started_at": r.started_at.isoformat() if r.started_at else None,
-            "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+            "started_at": (r.started_at.replace(tzinfo=datetime.timezone.utc).isoformat() if r.started_at else None),
+            "finished_at": (r.finished_at.replace(tzinfo=datetime.timezone.utc).isoformat() if r.finished_at else None),
             "total_items": r.total_items,
             "processed_items": r.processed_items,
             "created_files": r.created_files,
@@ -193,7 +201,7 @@ async def get_logs(limit: int = 100, offset: int = 0, level: str = "",
     return LogsResponse(logs=[
         {
             "id": l.id,
-            "created_at": l.created_at.isoformat() if l.created_at else None,
+            "created_at": (l.created_at.replace(tzinfo=datetime.timezone.utc).isoformat() if l.created_at else None),
             "level": l.level,
             "action": l.action,
             "message": l.message,
@@ -226,7 +234,14 @@ async def set_config(payload: ConfigSetRequest, db: Session = Depends(get_db)):
 @router.get("/api/scheduler")
 async def get_scheduler(db: Session = Depends(get_db)):
     """Get scheduler configuration."""
-    return get_scheduler_config(db)
+    data = get_scheduler_config(db)
+    snapshot = runtime_scheduler.snapshot()
+    return {
+        **data,
+        "active": snapshot.active,
+        "next_run_at": snapshot.next_run_at,
+        "last_checked_at": snapshot.last_checked_at,
+    }
 
 
 @router.post("/api/scheduler")
@@ -245,7 +260,8 @@ async def set_scheduler(payload: SchedulerConfigPayload, db: Session = Depends(g
         },
     )
     log_op("info", "config", f"Scheduler config updated: enabled={saved['enabled']}, cron={saved['cron']}")
-    return {"ok": True, **saved}
+    snapshot = runtime_scheduler.snapshot()
+    return {"ok": True, **saved, "active": snapshot.active, "next_run_at": snapshot.next_run_at, "last_checked_at": snapshot.last_checked_at}
 
 
 @router.get("/api/stats")

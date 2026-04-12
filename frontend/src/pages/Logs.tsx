@@ -5,40 +5,69 @@ import { fetchLogs } from '../api';
 
 const Logs = () => {
   const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [filterLevel, setFilterLevel] = useState<string>('ALL');
+  const [filterLevel, setFilterLevel] = useState<string>('全部');
 
   useEffect(() => {
-    const level = filterLevel === 'ALL' ? undefined : filterLevel;
-    fetchLogs(level).then(setLogs).catch(console.error);
+    let apiLevel: string | undefined;
+    switch(filterLevel) {
+      case '信息': apiLevel = 'INFO'; break;
+      case '警告': apiLevel = 'WARN'; break;
+      case '错误': apiLevel = 'ERROR'; break;
+      default: apiLevel = undefined;
+    }
+    
+    fetchLogs(apiLevel).then(setLogs).catch(console.error);
   }, [filterLevel]);
 
   const filteredLogs = logs;
 
   const getLogColor = (level: string) => {
     switch (level) {
-      case 'INFO': return 'text-[#00a8ff]';
-      case 'WARN': return 'text-yellow-500';
-      case 'ERROR': return 'text-[#e84118]';
-      default: return 'text-gray-400';
+      case 'INFO': return 'text-[#2563EB] bg-[#DBEAFE]';
+      case 'WARN': return 'text-[#D97706] bg-[#FEF3C7]';
+      case 'ERROR': return 'text-[#DC2626] bg-[#FEE2E2]';
+      default: return 'text-[#64748B] bg-[#F1F5F9]';
     }
   };
 
+  const getLogLabel = (level: string) => {
+    switch (level) {
+      case 'INFO': return '信息';
+      case 'WARN': return '警告';
+      case 'ERROR': return '错误';
+      default: return level;
+    }
+  };
+
+  const translateMessage = (message: string) => {
+    // Basic prefix matching
+    if (message.startsWith('Scan complete')) return message.replace('Scan complete', '扫描完成');
+    if (message.startsWith('Generation started')) return message.replace('Generation started', '生成任务已开始');
+    if (message.startsWith('Cleanup started')) return message.replace('Cleanup started', '清理任务已开始');
+    if (message.startsWith('Config set: source_dir =')) return message.replace('Config set: source_dir =', '配置已更新：媒体源目录 =');
+    if (message.startsWith('Config set: output_dir =')) return message.replace('Config set: output_dir =', '配置已更新：输出目录 =');
+    if (message.startsWith('Config set:')) return message.replace('Config set:', '配置已更新：');
+    
+    // More complex regex matching could go here
+    return message;
+  };
+
   return (
-    <div className="space-y-6 h-full flex flex-col">
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold text-white flex items-center">
-          <Terminal size={28} className="mr-3 text-[#00a8ff]" />
-          System Logs
+    <div className="space-y-6 h-[calc(100vh-8rem)] flex flex-col animate-in fade-in duration-500">
+      <div className="flex justify-between items-center mb-2">
+        <h1 className="text-[24px] font-semibold text-[#0F172A] flex items-center">
+          <Terminal size={24} className="mr-3 text-[#2563EB]" />
+          运行日志
         </h1>
-        <div className="flex space-x-2">
-          {['ALL', 'INFO', 'WARN', 'ERROR'].map(level => (
+        <div className="flex space-x-2 bg-white p-1 rounded-xl shadow-sm border border-[#E2E8F0]">
+          {['全部', '信息', '警告', '错误'].map(level => (
             <button
               key={level}
               onClick={() => setFilterLevel(level)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                 filterLevel === level
-                  ? 'bg-[#00a8ff] text-white shadow-lg shadow-blue-500/20'
-                  : 'bg-[#1e1e1e] border border-[#3d3d3d] text-gray-400 hover:text-white hover:bg-[#2d2d2d]'
+                  ? 'bg-[#2563EB] text-white shadow'
+                  : 'text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC]'
               }`}
             >
               {level}
@@ -47,32 +76,41 @@ const Logs = () => {
         </div>
       </div>
 
-      <div className="flex-1 bg-[#121212] rounded-xl border border-[#3d3d3d] overflow-hidden flex flex-col shadow-inner">
-        <div className="bg-[#1e1e1e] px-4 py-3 border-b border-[#3d3d3d] flex items-center text-gray-400 text-sm font-mono">
-          <Filter size={16} className="mr-2" />
-          <span>Viewing {filteredLogs.length} entries</span>
+      <div className="flex-1 glass-card bg-[#F8FAFC] overflow-hidden flex flex-col">
+        <div className="bg-white px-5 py-3 border-b border-[#E2E8F0] flex items-center text-[#64748B] text-xs font-mono shadow-sm z-10">
+          <Filter size={14} className="mr-2" />
+          <span>当前显示 {filteredLogs.length} 条记录</span>
         </div>
         
-        <div className="flex-1 overflow-y-auto p-4 font-mono text-sm">
-          <div className="space-y-1">
+        <div className="flex-1 overflow-y-auto p-5 font-mono text-sm bg-white">
+          <div className="space-y-1.5">
             {filteredLogs.map(log => (
-              <div key={log.id} className="flex group hover:bg-[#2d2d2d]/50 px-2 py-1 rounded transition-colors">
-                <span className="text-gray-500 w-48 shrink-0 select-none">
-                  {new Date(log.timestamp).toISOString().replace('T', ' ').substring(0, 19)}
+              <div key={log.id} className="flex group hover:bg-[#F1F5F9] px-3 py-2 rounded-lg transition-colors border border-transparent hover:border-[#E2E8F0]">
+                <span className="text-[#94A3B8] w-[180px] shrink-0 select-none flex items-center">
+                  {new Date(log.timestamp).toLocaleString('zh-CN', {
+                    timeZone: 'Asia/Shanghai',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false,
+                  })}
                 </span>
-                <span className={`w-16 shrink-0 font-bold select-none ${getLogColor(log.level)}`}>
-                  [{log.level}]
+                <span className={`w-[60px] shrink-0 text-xs font-bold select-none px-2 py-0.5 rounded flex items-center justify-center mr-4 ${getLogColor(log.level)}`}>
+                  {getLogLabel(log.level)}
                 </span>
-                <span className="text-gray-300 break-all">
-                  {log.message}
+                <span className="text-[#334155] break-all flex items-center">
+                  {translateMessage(log.message)}
                 </span>
               </div>
             ))}
           </div>
           {filteredLogs.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500 space-y-4">
+            <div className="flex flex-col items-center justify-center h-full text-[#94A3B8] space-y-4">
               <Search size={48} className="opacity-20" />
-              <p>No logs found matching filter '{filterLevel}'</p>
+              <p>未找到符合 '{filterLevel}' 级别的日志记录</p>
             </div>
           )}
         </div>

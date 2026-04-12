@@ -7,9 +7,9 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#121212] text-gray-200">
+    <div className="flex h-screen w-screen overflow-hidden bg-[#F5F7FB] text-[#0F172A] font-sans">
       <Sidebar />
-      <main className="flex-1 overflow-y-auto p-8 relative">
+      <main className="flex-1 overflow-y-auto p-6 md:p-8 relative">
         <div className="max-w-5xl mx-auto">
           {children}
         </div>

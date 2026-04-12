@@ -2,12 +2,13 @@
 import asyncio
 import base64
 import os
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import init_db
 from app.routes.api import router as api_router
 from app.services.websocket import ws_manager
+from app.services.runtime_scheduler import runtime_scheduler
 
 
 def verify_basic_auth(request: Request) -> str:
@@ -29,8 +30,8 @@ def verify_basic_auth(request: Request) -> str:
             headers={"WWW-Authenticate": 'Basic realm="STRM Generator"'},
         )
     from secrets import compare_digest
-    correct_user = os.getenv("STRS_AUTH_USER", "admin")
-    correct_pass = os.getenv("STRS_AUTH_PASS", "strm2026")
+    correct_user = os.getenv("STRS_AUTH_USER", "jdyyds")
+    correct_pass = os.getenv("STRS_AUTH_PASS", "f15015699065")
     if not (compare_digest(username, correct_user) and compare_digest(password, correct_pass)):
         raise HTTPException(
             status_code=401,
@@ -55,8 +56,9 @@ app.include_router(api_router)
 
 
 @app.on_event("startup")
-def on_startup():
+async def on_startup():
     init_db()
+    runtime_scheduler.start()
 
 
 @app.websocket("/ws")
@@ -75,8 +77,8 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=4001)
         return
     from secrets import compare_digest
-    correct_user = os.getenv("STRS_AUTH_USER", "admin")
-    correct_pass = os.getenv("STRS_AUTH_PASS", "strm2026")
+    correct_user = os.getenv("STRS_AUTH_USER", "jdyyds")
+    correct_pass = os.getenv("STRS_AUTH_PASS", "f15015699065")
     if not (compare_digest(username, correct_user) and compare_digest(password, correct_pass)):
         await websocket.close(code=4001)
         return
@@ -95,6 +97,11 @@ async def websocket_endpoint(websocket: WebSocket):
                 await websocket.send_json({"type": "heartbeat"})
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
+
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await runtime_scheduler.stop()
 
 
 @app.get("/health")

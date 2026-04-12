@@ -21,11 +21,11 @@ EPISODE_PATTERNS = [
     re.compile(r'^(.+?)\s*S(\d{2})E(\d{2,4})$', re.IGNORECASE),
 ]
 
-# Regex for movie: "Title (Year).mp4/.mkv"
-MOVIE_PATTERN = re.compile(r'^(.+?)\s*\((\d{4})\)\.(mp4|mkv|avi|mov|wmv)$', re.IGNORECASE)
+# Regex for movie: "Title (Year).mp4/.mkv/..."
+MOVIE_PATTERN = re.compile(r'^(.+?)\s*\((\d{4})\)\.(mp4|mkv|avi|mov|wmv|m2ts|ts|iso)$', re.IGNORECASE)
 
 # Media extensions to scan
-MEDIA_EXTS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv'}
+MEDIA_EXTS = {'.mp4', '.mkv', '.avi', '.mov', '.wmv', '.m2ts', '.ts', '.iso'}
 
 
 def _file_hash(path: Path) -> str:
@@ -92,7 +92,7 @@ def scan_source_dir(source_dir: Path = None) -> tuple[list[MediaItem], list[str]
         errors.append(f"Source dir does not exist: {source_dir}")
         return items, errors
 
-    # Walk movies: /电影/[分类]/[片名 (年份)]/[视频文件]
+    # Walk movies: /电影/[分类]/[片名 (年份)]/[视频文件] or BDMV structure
     movies_root = source_dir / "电影"
     if movies_root.exists():
         for category_folder in sorted(movies_root.iterdir()):
@@ -106,15 +106,36 @@ def scan_source_dir(source_dir: Path = None) -> tuple[list[MediaItem], list[str]
                 m = re.match(r'.+\((\d{4})\)', folder.name)
                 if m:
                     year = int(m.group(1))
+
+                matched_movie = False
                 for f in sorted(folder.iterdir()):
-                    if f.suffix.lower() not in MEDIA_EXTS:
+                    if f.is_file() and f.suffix.lower() in MEDIA_EXTS:
+                        items.append(MediaItem(
+                            path=f,
+                            media_type='movie',
+                            title=title,
+                            year=year,
+                            category=category_folder.name,
+                        ))
+                        matched_movie = True
+
+                if matched_movie:
+                    continue
+
+                bdmv_stream = folder / 'BDMV' / 'STREAM'
+                if bdmv_stream.exists() and bdmv_stream.is_dir():
+                    m2ts_files = sorted([p for p in bdmv_stream.iterdir() if p.is_file() and p.suffix.lower() == '.m2ts'])
+                    if m2ts_files:
+                        # Pick the largest stream file as the main title by default.
+                        main_file = max(m2ts_files, key=lambda p: p.stat().st_size)
+                        items.append(MediaItem(
+                            path=main_file,
+                            media_type='movie',
+                            title=title,
+                            year=year,
+                            category=category_folder.name,
+                        ))
                         continue
-                    items.append(MediaItem(
-                        path=f,
-                        media_type='movie',
-                        title=title,
-                        year=year,
-                    ))
 
     # Walk TV shows
     shows_root = source_dir / "电视剧"
@@ -132,10 +153,12 @@ def scan_source_dir(source_dir: Path = None) -> tuple[list[MediaItem], list[str]
                 m = re.match(r'.+\((\d{4})\)', show_folder.name)
                 if m:
                     year = int(m.group(1))
+
                 # Find Season folders
                 for season_folder in sorted(show_folder.iterdir()):
                     if not season_folder.is_dir():
                         continue
+
                     # Parse season: "Season 1" or "Season X"
                     season = None
                     sm = re.match(r'[Ss]eason\s*(\d+)', season_folder.name)
@@ -146,37 +169,69 @@ def scan_source_dir(source_dir: Path = None) -> tuple[list[MediaItem], list[str]
                         sm = re.match(r'^(\d+)$', season_folder.name.strip())
                         if sm:
                             season = int(sm.group(1))
-                    if season is None:
+
+                    if season is not None:
+                        # Find episode files directly inside season folder
+                        for ep_file in sorted(season_folder.iterdir()):
+                            if not ep_file.is_file() or ep_file.suffix.lower() not in MEDIA_EXTS:
+                                continue
+                            episode = None
+                            episode_title = None
+                            matched_title = title
+                            parsed_season = season
+                            for pat in EPISODE_PATTERNS:
+                                m = pat.match(ep_file.stem)
+                                if m:
+                                    matched_title = m.group(1).strip()
+                                    parsed_season = int(m.group(2))
+                                    episode = int(m.group(3))
+                                    if len(m.groups()) >= 4:
+                                        episode_title = m.group(4).strip()
+                                    break
+                            if episode is None:
+                                errors.append(f"Could not parse episode from: {ep_file}")
+                                continue
+                            items.append(MediaItem(
+                                path=ep_file,
+                                media_type='episode',
+                                title=matched_title,
+                                year=year,
+                                season=parsed_season,
+                                episode=episode,
+                                episode_title=episode_title,
+                                category=category,
+                            ))
                         continue
-                    # Find episode files
-                    for ep_file in sorted(season_folder.iterdir()):
-                        if ep_file.suffix.lower() not in MEDIA_EXTS:
-                            continue
-                        episode = None
-                        episode_title = None
-                        matched_title = title
-                        for pat in EPISODE_PATTERNS:
-                            m = pat.match(ep_file.stem)
-                            if m:
-                                matched_title = m.group(1).strip()
-                                season = int(m.group(2))
-                                episode = int(m.group(3))
-                                if len(m.groups()) >= 4:
-                                    episode_title = m.group(4).strip()
-                                break
-                        if episode is None:
-                            # Couldn't parse episode number - skip or use filename index
-                            errors.append(f"Could not parse episode from: {ep_file}")
-                            continue
-                        items.append(MediaItem(
-                            path=ep_file,
-                            media_type='episode',
-                            title=matched_title,
-                            year=year,
-                            season=season,
-                            episode=episode,
-                            episode_title=episode_title,
-                            category=category,
-                        ))
+
+                    # Support non-standard TV structures like /电视剧/[分类]/[剧名]/BDMV/STREAM/*.m2ts
+                    if season_folder.name.upper() == 'BDMV':
+                        stream_dir = season_folder / 'STREAM'
+                        if stream_dir.exists() and stream_dir.is_dir():
+                            m2ts_files = sorted(
+                                [p for p in stream_dir.iterdir() if p.is_file() and p.suffix.lower() == '.m2ts'],
+                                key=lambda p: p.name,
+                            )
+                            existing_keys = {
+                                (item.season, item.episode)
+                                for item in items
+                                if item.media_type == 'episode' and item.title == title and item.category == category
+                            }
+                            next_episode = 1
+                            for ep_file in m2ts_files:
+                                while (1, next_episode) in existing_keys:
+                                    next_episode += 1
+                                items.append(MediaItem(
+                                    path=ep_file,
+                                    media_type='episode',
+                                    title=title,
+                                    year=year,
+                                    season=1,
+                                    episode=next_episode,
+                                    episode_title=f"BDMV {next_episode:02d}",
+                                    category=category,
+                                ))
+                                existing_keys.add((1, next_episode))
+                                next_episode += 1
+                        continue
 
     return items, errors

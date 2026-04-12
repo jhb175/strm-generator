@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Save, AlertCircle } from 'lucide-react';
+import { Save, AlertCircle, CheckCircle } from 'lucide-react';
 import type { AppConfig } from '../types';
 import { fetchConfig as apiFetchConfig, saveConfig as apiSaveConfig } from '../api';
 
@@ -16,7 +16,7 @@ const Configuration = () => {
         setLoading(false);
       })
       .catch(err => {
-        setError(err.message || 'Failed to load configuration');
+        setError(err.message || '加载配置失败');
         setLoading(false);
       });
   }, []);
@@ -33,31 +33,36 @@ const Configuration = () => {
     
     try {
       if (!config.source_dir || !config.output_dir) {
-        setError("Paths cannot be empty.");
+        setError("路径不能为空。");
       } else {
         await apiSaveConfig(config);
         setSuccess(true);
         setTimeout(() => setSuccess(false), 3000);
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to save configuration');
+      setError(err.message || '保存配置失败');
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading && !config.source_dir) return <div className="text-gray-400">Loading...</div>;
+  if (loading && !config.source_dir) return <div className="text-[#64748B] text-center py-10">加载中...</div>;
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold text-white mb-8">Configuration</h1>
+      <h1 className="text-[24px] font-semibold text-[#0F172A] mb-6">系统配置</h1>
 
-      <div className="bg-[#1e1e1e] rounded-xl border border-[#3d3d3d] overflow-hidden">
+      <div className="glass-card bg-white overflow-hidden">
+        <div className="px-6 py-5 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+          <h2 className="text-lg font-semibold text-[#0F172A]">目录映射配置</h2>
+          <p className="text-sm text-[#64748B] mt-1">配置媒体源目录与 STRM 输出目录</p>
+        </div>
+        
         <form onSubmit={handleSave} className="p-6">
           <div className="space-y-6">
             <div>
-              <label htmlFor="source_dir" className="block text-sm font-medium text-gray-300 mb-2">
-                Source Directory (G-Drive Mount)
+              <label htmlFor="source_dir" className="block text-sm font-semibold text-[#334155] mb-2">
+                媒体源目录 (如 G-Drive 挂载点)
               </label>
               <input
                 type="text"
@@ -65,17 +70,17 @@ const Configuration = () => {
                 name="source_dir"
                 value={config.source_dir}
                 onChange={handleChange}
-                className="w-full bg-[#2d2d2d] border border-[#3d3d3d] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#00a8ff] focus:ring-1 focus:ring-[#00a8ff] transition-colors"
+                className="w-full bg-white border border-[#CBD5E1] rounded-xl px-4 py-3 text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors shadow-sm"
                 placeholder="/data/clouddrive/gdrive"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Directory containing '电影/' and '电视剧/' folders.
+              <p className="mt-2 text-xs text-[#64748B]">
+                包含 '电影/' 和 '电视剧/' 等分类文件夹的根目录。
               </p>
             </div>
 
             <div>
-              <label htmlFor="output_dir" className="block text-sm font-medium text-gray-300 mb-2">
-                Output Directory (STRM Library)
+              <label htmlFor="output_dir" className="block text-sm font-semibold text-[#334155] mb-2">
+                STRM 输出目录
               </label>
               <input
                 type="text"
@@ -83,40 +88,41 @@ const Configuration = () => {
                 name="output_dir"
                 value={config.output_dir}
                 onChange={handleChange}
-                className="w-full bg-[#2d2d2d] border border-[#3d3d3d] rounded-lg px-4 py-2 text-white focus:outline-none focus:border-[#00a8ff] focus:ring-1 focus:ring-[#00a8ff] transition-colors"
+                className="w-full bg-white border border-[#CBD5E1] rounded-xl px-4 py-3 text-[#0F172A] focus:outline-none focus:border-[#2563EB] focus:ring-1 focus:ring-[#2563EB] transition-colors shadow-sm"
                 placeholder="/opt/strm_yesy"
               />
-              <p className="mt-1 text-xs text-gray-500">
-                Target directory for generated .strm files. Emby should map this.
+              <p className="mt-2 text-xs text-[#64748B]">
+                生成的 .strm 文件将被保存在此目录下，供 Emby 等媒体服务器刮削。
               </p>
             </div>
           </div>
 
           {error && (
-            <div className="mt-6 p-4 bg-[#e84118] bg-opacity-10 border border-[#e84118] rounded-lg flex items-center text-[#e84118]">
-              <AlertCircle size={20} className="mr-2" />
-              {error}
+            <div className="mt-6 p-4 bg-[#FEF2F2] border border-[#FCA5A5] rounded-xl flex items-center text-[#EF4444]">
+              <AlertCircle size={20} className="mr-2 shrink-0" />
+              <span className="text-sm font-medium">{error}</span>
             </div>
           )}
 
           {success && (
-            <div className="mt-6 p-4 bg-green-500 bg-opacity-10 border border-green-500 rounded-lg flex items-center text-green-500">
-              Configuration saved and paths validated successfully.
+            <div className="mt-6 p-4 bg-[#ECFDF5] border border-[#6EE7B7] rounded-xl flex items-center text-[#10B981]">
+              <CheckCircle size={20} className="mr-2 shrink-0" />
+              <span className="text-sm font-medium">配置已成功保存并验证路径。</span>
             </div>
           )}
 
-          <div className="mt-8 pt-6 border-t border-[#3d3d3d] flex justify-end">
+          <div className="mt-8 pt-6 border-t border-[#E2E8F0] flex justify-end">
             <button
               type="submit"
               disabled={loading}
-              className={`flex items-center px-6 py-2 rounded-lg font-medium transition-colors ${
+              className={`flex items-center px-6 py-2.5 rounded-xl font-medium transition-colors h-10 ${
                 loading
-                  ? 'bg-blue-600/50 text-blue-200 cursor-not-allowed'
-                  : 'bg-[#00a8ff] hover:bg-[#0097e6] text-white shadow-lg shadow-blue-500/20'
+                  ? 'bg-[#93C5FD] text-white cursor-not-allowed'
+                  : 'bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md'
               }`}
             >
               <Save size={18} className="mr-2" />
-              {loading ? 'Saving...' : 'Save Configuration'}
+              {loading ? '保存中...' : '保存配置'}
             </button>
           </div>
         </form>
