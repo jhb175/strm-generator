@@ -33,8 +33,20 @@ const Dashboard = () => {
     loadEmbyStats();
 
     const embyInterval = window.setInterval(() => {
-      fetchEmbyStats().then(setEmbyStats).catch(console.error);
-    }, 30000);
+      fetchEmbyStats()
+        .then((data) => {
+          setEmbyError(null);
+          setEmbyStats((prev) => {
+            if (JSON.stringify(prev) === JSON.stringify(data)) {
+              return prev;
+            }
+            return data;
+          });
+        })
+        .catch((err) => {
+          console.error('Silent refresh Emby stats failed', err);
+        });
+    }, 120000);
 
     window.addEventListener('taskFinished', loadStats);
     window.addEventListener('taskFinished', loadEmbyStats);
@@ -50,7 +62,12 @@ const Dashboard = () => {
     setEmbyError(null);
     try {
       const data = await refreshEmbyStats();
-      setEmbyStats(data);
+      setEmbyStats((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(data)) {
+          return prev;
+        }
+        return data;
+      });
     } catch (err) {
       console.error('Failed to refresh Emby stats', err);
       setEmbyError('Emby 统计刷新失败，请稍后重试');
