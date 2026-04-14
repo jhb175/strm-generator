@@ -30,8 +30,8 @@ def verify_basic_auth(request: Request) -> str:
             headers={"WWW-Authenticate": 'Basic realm="STRM Generator"'},
         )
     from secrets import compare_digest
-    correct_user = os.getenv("STRS_AUTH_USER", "jdyyds")
-    correct_pass = os.getenv("STRS_AUTH_PASS", "f15015699065")
+    correct_user = os.getenv("STRS_AUTH_USER", "change_me")
+    correct_pass = os.getenv("STRS_AUTH_PASS", "change_me_now")
     if not (compare_digest(username, correct_user) and compare_digest(password, correct_pass)):
         raise HTTPException(
             status_code=401,
@@ -77,8 +77,8 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.close(code=4001)
         return
     from secrets import compare_digest
-    correct_user = os.getenv("STRS_AUTH_USER", "jdyyds")
-    correct_pass = os.getenv("STRS_AUTH_PASS", "f15015699065")
+    correct_user = os.getenv("STRS_AUTH_USER", "change_me")
+    correct_pass = os.getenv("STRS_AUTH_PASS", "change_me_now")
     if not (compare_digest(username, correct_user) and compare_digest(password, correct_pass)):
         await websocket.close(code=4001)
         return

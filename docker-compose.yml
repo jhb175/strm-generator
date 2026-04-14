@@ -14,11 +14,11 @@ services:
       - STRM_SOURCE_DIR=/data/clouddrive/gdrive
       - STRM_OUTPUT_DIR=/app/output
       - STRM_BASE_DIR=/app/data
-      - STRS_AUTH_USER=jdyyds
-      - STRS_AUTH_PASS=f15015699065
-      - EMBY_URL=http://188.165.244.137:8096
-      - EMBY_API_KEY=c697ac73dabb4e94aa0ac447409f7569
-      - EMBY_RECENT_DAYS=7
+      - STRS_AUTH_USER=${STRS_AUTH_USER:-change_me}
+      - STRS_AUTH_PASS=${STRS_AUTH_PASS:-change_me_now}
+      - EMBY_URL=${EMBY_URL:-http://emby:8096}
+      - EMBY_API_KEY=${EMBY_API_KEY:-replace_with_real_key}
+      - EMBY_RECENT_DAYS=${EMBY_RECENT_DAYS:-7}
     restart: unless-stopped
     networks:
       - strm-net

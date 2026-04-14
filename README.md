@@ -1,7 +1,7 @@
-# 映链 / STRM Media Bridge
+# STRM Generator
 
 ## 项目介绍
-映链（STRM Media Bridge）是一个基于 **FastAPI + React + TypeScript** 的 STRM 生成与管理工具，用于扫描媒体源目录、生成 `.strm` 文件，并接入 Emby / Jellyfin / Plex 等媒体服务器。
+这是一个基于 **FastAPI + React + TypeScript** 的 STRM 生成与管理工具，用于扫描媒体源目录、生成 `.strm` 文件，并接入 Emby / Jellyfin / Plex 等媒体服务器。
 
 当前项目已完成：
 - 前后端一体化 Docker Compose 部署
@@ -35,14 +35,27 @@
 
 ### 一键启动
 ```bash
-git clone https://github.com/jhb175/strm-generator.git
+git clone https://github.com/<your-account>/strm-generator.git
 cd strm-generator
+cp .env.example .env
+# 编辑 .env，填入你自己的认证信息和 Emby 配置
 docker compose up -d --build
 ```
 
 ### 默认访问地址
 - 前端：`http://localhost:8888`
 - 后端：`http://localhost:3011`
+
+## 环境变量
+建议通过 `.env` 提供敏感信息：
+
+```env
+STRS_AUTH_USER=change_me
+STRS_AUTH_PASS=change_me_now
+EMBY_URL=http://emby:8096
+EMBY_API_KEY=replace_with_real_key
+EMBY_RECENT_DAYS=7
+```
 
 ## STRM 内容格式
 当前 `.strm` 文件内容为容器内可访问的绝对路径，例如：
@@ -77,10 +90,10 @@ docker compose up -d --build
 - `0 3 * * *` → 每天凌晨 3 点执行一次
 
 ## 安全说明
-为了避免把这个项目直接暴露成“裸服务”，建议至少做到以下几点：
+为了避免把这个项目直接暴露成裸服务，建议至少做到以下几点：
 
 ### 1. 修改默认认证信息
-请不要继续使用仓库中的示例凭据。通过环境变量覆盖：
+不要继续使用示例凭据。通过 `.env` 或环境变量覆盖：
 
 ```bash
 STRS_AUTH_USER=your_user
@@ -107,6 +120,7 @@ STRS_AUTH_PASS=your_strong_password
 - 真实账号密码
 - 私有域名 / 私有路径
 - 服务器 SSH 信息
+- 任何带认证信息的 Git remote URL
 
 ### 5. 建议配合防火墙
 至少限制：
@@ -132,9 +146,6 @@ STRS_AUTH_PASS=your_strong_password
 旧版本对 4 位 episode 编号支持不足。当前版本已修复，例如：
 - `S01E1046`
 - `S01E1323`
-
-## 仓库地址
-- GitHub: https://github.com/jhb175/strm-generator
 
 ## License
 MIT

@@ -6,11 +6,11 @@
 
 管理界面受 HTTP Basic Auth 保护。
 
-**默认账号：**
-- 用户名：`admin`
-- 密码：`strm2026`
+**示例账号：**
+- 用户名：`change_me`
+- 密码：`change_me_now`
 
-**通过环境变量修改：**
+**请通过环境变量修改：**
 ```bash
 STRS_AUTH_USER=your_user
 STRS_AUTH_PASS=your_password
@@ -245,8 +245,8 @@ docker run -d \
   -v /opt/strm_yesy/data:/app/data \
   -e STRM_SOURCE_DIR=/data/clouddrive/gdrive \
   -e STRM_OUTPUT_DIR=/app/output \
-  -e STRS_AUTH_USER=admin \
-  -e STRS_AUTH_PASS=strm2026 \
+  -e STRS_AUTH_USER=your_user \
+  -e STRS_AUTH_PASS=your_password \
   strm-generator
 ```
 
@@ -264,8 +264,8 @@ services:
     environment:
       - STRM_SOURCE_DIR=/data/clouddrive/gdrive
       - STRM_OUTPUT_DIR=/app/output
-      - STRS_AUTH_USER=admin
-      - STRS_AUTH_PASS=strm2026
+      - STRS_AUTH_USER=${STRS_AUTH_USER:-change_me}
+      - STRS_AUTH_PASS=${STRS_AUTH_PASS:-change_me_now}
 
 volumes:
   strm-output:

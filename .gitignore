@@ -1,28 +1,17 @@
+# Local env and secrets
+.env
+.env.*
+!.env.example
+
 # Python
 __pycache__/
-*.py[cod]
-*.egg-info/
-dist/
-build/
-.venv/
+*.pyc
+*.pyo
+*.pyd
 
 # Node
 node_modules/
 dist/
-.env
-.env.local
 
-# IDE
-.idea/
-.vscode/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Docker
-.docker/
-
-# Logs
-*.log
-logs/
+# Runtime data
+backend/data/
