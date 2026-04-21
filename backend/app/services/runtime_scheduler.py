@@ -10,6 +10,7 @@ from typing import Optional
 from croniter import croniter
 
 from app.db import SessionLocal
+from app.models import TaskRun
 from app.services.scheduler import get_scheduler_config
 from app.services.state import task_state, log_op
 from app.services.generator import run_generate
@@ -73,9 +74,23 @@ class RuntimeScheduler:
             active=bool(self._loop_task and not self._loop_task.done()),
         )
 
+    def _has_active_scheduled_run(self) -> bool:
+        db = SessionLocal()
+        try:
+            active = db.query(TaskRun).filter(
+                TaskRun.task_type == "scheduled_generate",
+                TaskRun.status == "RUNNING",
+            ).first()
+            return active is not None
+        finally:
+            db.close()
+
     async def trigger_now(self, reason: str = "manual") -> None:
         if self._running_lock.locked():
-            log_op("warning", "scheduler", f"Skip scheduled run because a task is already running ({reason})")
+            log_op("warning", "scheduler", f"Skip scheduled run because a task is already running in-process ({reason})")
+            return
+        if self._has_active_scheduled_run():
+            log_op("warning", "scheduler", f"Skip scheduled run because another scheduled_generate is already marked RUNNING ({reason})")
             return
         async with self._running_lock:
             task_id = task_state.start_task("scheduled_generate")

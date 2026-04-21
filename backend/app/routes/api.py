@@ -104,6 +104,15 @@ async def _run_cleanup_bg(task_id: str, output_dir: str | None, dry_run: bool):
         await ws_manager.push_progress(task_id, "cleanup", "FAILED", error_message=str(e))
 
 
+def _start_background_coroutine(coro) -> None:
+    """Run a coroutine in a dedicated background thread with its own event loop."""
+    def runner():
+        asyncio.run(coro)
+
+    thread = threading.Thread(target=runner, daemon=True)
+    thread.start()
+
+
 @router.post("/api/tasks/scan", response_model=TriggerResponse)
 async def trigger_scan(
     source_dir: str | None = None,
@@ -113,7 +122,7 @@ async def trigger_scan(
     """Trigger scan + STRM generation for the current source directory."""
     task_id = task_state.start_task("scan")
     task_state.update(task_id, message="Queued for scan and generation...")
-    asyncio.create_task(_run_generate_bg(task_id, source_dir, None, incremental))
+    _start_background_coroutine(_run_generate_bg(task_id, source_dir, None, incremental))
     return TriggerResponse(ok=True, task_id=task_id,
                             message=f"Scan and generation started (task {task_id})")
 
@@ -127,7 +136,7 @@ async def trigger_generate(
     """Trigger STRM file generation."""
     task_id = task_state.start_task("generate")
     task_state.update(task_id, message="Queued for generation...")
-    asyncio.create_task(_run_generate_bg(task_id, source_dir, output_dir, incremental))
+    _start_background_coroutine(_run_generate_bg(task_id, source_dir, output_dir, incremental))
     return TriggerResponse(ok=True, task_id=task_id,
                             message=f"Generation started (task {task_id})")
 
@@ -140,7 +149,7 @@ async def trigger_cleanup(
     """Trigger orphaned STRM cleanup."""
     task_id = task_state.start_task("cleanup")
     task_state.update(task_id, message="Queued for cleanup...")
-    asyncio.create_task(_run_cleanup_bg(task_id, output_dir, dry_run))
+    _start_background_coroutine(_run_cleanup_bg(task_id, output_dir, dry_run))
     return TriggerResponse(ok=True, task_id=task_id,
                             message=f"Cleanup started (task {task_id}, dry_run={dry_run})")
 
